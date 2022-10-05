@@ -7,6 +7,10 @@ class Game
     @board = BoardCreator.new.game_board
   end
 
+  def update_valid_moves
+
+  end
+
   def display_board
     puts %x(/usr/bin/clear)
     puts '   A  B  C  D  E  F  G  H '
