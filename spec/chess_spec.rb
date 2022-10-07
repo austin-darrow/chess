@@ -7,6 +7,7 @@ describe Board do
 
   describe '#create_board' do
     it 'creates and links board spaces' do
+
     end
   end
 end
