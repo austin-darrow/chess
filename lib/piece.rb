@@ -9,18 +9,108 @@ class Piece
     @total_moves = 0
     @valid_moves = []
   end
+
+  def find(coord, squares)
+    squares.select { |sq| sq.coord == coord }.first
+  end
 end
 
 # =========================================================================
 # =========================================================================
 
 class Pawn < Piece
+  attr_accessor :double_moved, :final_row
+
   def initialize(type, team, square)
     super
     @board_piece = @team == 'team_one' ? "♙" : "\u001b[31m♟"
+    @double_moved = false
+    @final_row = false
   end
 
   def update_valid_moves(all_squares)
+    # Reset
+    @valid_moves = []
+    current_column = @square.column
+    current_row = @square.row
+    c = %w[A B C D E F G H]
+    current_c_ind = c.index(current_column)
+
+    if @team == 'team_one'
+      # Normal move 1
+      square_above = find("#{current_column}#{current_row + 1}", all_squares)
+      @valid_moves << square_above if square_above.piece.nil?
+
+      # Move 2 if pawn hasn't moved yet
+      if @total_moves.zero?
+        two_above = find("#{current_column}#{current_row + 2}", all_squares)
+        @valid_moves << two_above if two_above.piece.nil? && square_above.piece.nil?
+      end
+
+      # Capture enemy pieces if in diagonals 1 away
+      left_up_diag = find("#{c[current_c_ind - 1]}#{current_row + 1}", all_squares)
+      unless left_up_diag.nil? || left_up_diag.piece.nil? || left_up_diag.piece.team == @team
+        @valid_moves << left_up_diag
+      end
+      right_up_diag = find("#{c[current_c_ind + 1]}#{current_row + 1}", all_squares)
+      unless right_up_diag.nil? || right_up_diag.piece.nil? || right_up_diag.piece.team == @team
+        @valid_moves << right_up_diag
+      end
+      # En passant special move
+      l = find("#{c[current_c_ind - 1]}#{current_row}", all_squares)
+      r = find("#{c[current_c_ind + 1]}#{current_row}", all_squares)
+      [l, r].each do |side|
+        unless side.nil? || side.piece.nil? || side.piece.team == @team
+          if side.piece.type == 'pawn' && side.piece.double_moved == true
+            @valid_moves << right_up_diag if side == r
+            @valid_moves << left_up_diag if side == l
+          end
+        end
+      end
+
+      # Transform if pawn moves to final row
+      if @square.row == 8
+        @final_row = true
+      end
+
+    elsif @team == 'team_two'
+      # Normal move 1
+      square_below = find("#{current_column}#{current_row - 1}" , all_squares)
+      @valid_moves << square_below if square_below.piece.nil?
+
+      # Move 2 if pawn hasn't moved yet
+      if @total_moves.zero?
+        two_below = find("#{current_column}#{current_row - 2}" , all_squares)
+        @valid_moves << two_below if two_below.piece.nil? && square_below.piece.nil?
+      end
+
+      # Capture enemy pieces if in diagonals 1 away
+      left_down_diag = find("#{c[current_c_ind - 1]}#{current_row - 1}" , all_squares)
+      unless left_down_diag.nil? || left_down_diag.piece.nil? || left_down_diag.piece.team == @team
+        @valid_moves << left_down_diag
+      end
+      right_down_diag = find("#{c[current_c_ind + 1]}#{current_row - 1}" , all_squares)
+      unless right_down_diag.nil? || right_down_diag.piece.nil? || right_down_diag.piece.team == @team
+        @valid_moves << right_down_diag
+      end
+
+      # En passant special move
+      l = find("#{c[current_c_ind - 1]}#{current_row}", all_squares)
+      r = find("#{c[current_c_ind + 1]}#{current_row}", all_squares)
+      [l, r].each do |side|
+        unless side.nil? || side.piece.nil? || side.piece.team == @team
+          if side.piece.type == 'pawn' && side.piece.double_moved == true
+            @valid_moves << right_down_diag if side == r
+            @valid_moves << left_down_diag if side == l
+          end
+        end
+      end
+
+      # Transform if pawn moves to final row
+      if @square.row == 1
+        @final_row = true
+      end
+    end
   end
 end
 
@@ -110,7 +200,7 @@ class Knight < Piece
     # Select all potential 8 squares a knight could move to unless coordinates are off the board
     current_r = @square.row
     current_c = @square.column
-    letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+    letters = %w[A B C D E F G H]
     current_c_ind = letters.index(current_c)
     transformations = [[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]]
     valid_coords = []
