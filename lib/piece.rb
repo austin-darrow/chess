@@ -159,28 +159,30 @@ class Rook < Piece
     l.sort! { |a, b| b.coord <=> a.coord }
     valid_l = l.take_while { |sq| sq.piece.nil? }
     l -= valid_l
-    valid_l << l.first unless l.empty? || @team == l.first.piece.team
+    valid_l << l.first
 
     # From r array
     r.sort! { |a, b| a.coord <=> b.coord }
     valid_r = r.take_while { |sq| sq.piece.nil? }
     r -= valid_r
-    valid_r << r.first unless r.empty? || @team == r.first.piece.team
+    valid_r << r.first
 
     # From u array
     u.sort! { |a, b| a.coord <=> b.coord }
     valid_u = u.take_while { |sq| sq.piece.nil? }
     u -= valid_u
-    valid_u << u.first unless u.empty? || @team == u.first.piece.team
+    valid_u << u.first
 
     # From d array
     d.sort! { |a, b| b.coord <=> a.coord }
     valid_d = d.take_while { |sq| sq.piece.nil? }
     d -= valid_d
-    valid_d << d.first unless d.empty? || @team == d.first.piece.team
+    valid_d << d.first
 
     # Add all to @valid_moves and clean it up
-    @valid_moves << valid_l + valid_r + valid_u + valid_d
+    valid = [valid_l, valid_r, valid_u, valid_d].flatten.compact
+    valid.select! { |sq| sq.piece ? sq.piece.team != @team : sq }
+    @valid_moves << valid
     @valid_moves.flatten!.compact!
   end
 end
@@ -234,6 +236,52 @@ class Bishop < Piece
   end
 
   def update_valid_moves(all_squares)
+    # Reset
+    @valid_moves = []
+    c = %w[A B C D E F G H]
+    current_c_ind = c.index(@square.column)
+    current_r = @square.row
+
+
+    # Get Squares using coordinates for diagonals in all 4 directions
+    ru = [] # Diagonal right/up (quadrant 1)
+    rd = [] # Diagonal right/down (quadrant 2)
+    ld = [] # Diagonal left/down (quadrant 3)
+    lu = [] # Diagonal left/up (quadrant 4)
+    for i in 1..7 do
+      ru << find("#{c[current_c_ind + i]}#{current_r + i}", all_squares) if (current_c_ind + i < 8) && (current_r + i < 9)
+      rd << find("#{c[current_c_ind + i]}#{current_r - i}", all_squares) if (current_c_ind + i < 8) && (current_r - i > 0)
+      ld << find("#{c[current_c_ind - i]}#{current_r - i}", all_squares) if (current_c_ind - i > -1) && (current_r - i > 0)
+      lu << find("#{c[current_c_ind - i]}#{current_r + i}", all_squares) if (current_c_ind - i > -1) && (current_r + i < 9)
+    end
+
+    # Extract from ru array only empty squares + first square with an enemy piece, as
+    # bishops cannot jump other pieces
+    valid_ru = ru.take_while { |sq| sq.piece.nil? }
+    ru -= valid_ru
+    valid_ru << ru.first
+
+    # From rd array
+    valid_rd = rd.take_while { |sq| sq.piece.nil? }
+    rd -= valid_rd
+    valid_rd << rd.first
+
+    # From ld array
+    valid_ld = ld.take_while { |sq| sq.piece.nil? }
+    ld -= valid_ld
+    valid_ld << ld.first
+
+    # From lu array
+    valid_lu = lu.take_while { |sq| sq.piece.nil? }
+    lu -= valid_lu
+    valid_lu << lu
+
+    # Add all valid moves to array
+    valid = [valid_ru, valid_rd, valid_ld, valid_lu].flatten.compact
+    valid.select! { |sq| sq.piece ? sq.piece.team != @team : sq }
+    all_squares.each do |other_square|
+      @valid_moves << other_square if valid.include?(other_square)
+    end
   end
 end
 
@@ -247,6 +295,104 @@ class Queen < Piece
   end
 
   def update_valid_moves(all_squares)
+    # Reset
+    @valid_moves = []
+    c = %w[A B C D E F G H]
+    current_c_ind = c.index(@square.column)
+    current_r = @square.row
+    current_c = @square.column
+
+
+    # Get Squares using coordinates for all directions
+    ru = [] # Diagonal right/up (quadrant 1)
+    rd = [] # Diagonal right/down (quadrant 2)
+    ld = [] # Diagonal left/down (quadrant 3)
+    lu = [] # Diagonal left/up (quadrant 4)
+    l = []
+    r = []
+    u = []
+    d = []
+
+    # Add squares to diagonal arrays
+    for i in 1..7 do
+      ru << find("#{c[current_c_ind + i]}#{current_r + i}", all_squares) if (current_c_ind + i < 8) && (current_r + i < 9)
+      rd << find("#{c[current_c_ind + i]}#{current_r - i}", all_squares) if (current_c_ind + i < 8) && (current_r - i > 0)
+      ld << find("#{c[current_c_ind - i]}#{current_r - i}", all_squares) if (current_c_ind - i > -1) && (current_r - i > 0)
+      lu << find("#{c[current_c_ind - i]}#{current_r + i}", all_squares) if (current_c_ind - i > -1) && (current_r + i < 9)
+    end
+
+    # Add squares to cardinal arrays
+    all_squares.each do |other_square|
+      other_r = other_square.row
+      other_c = other_square.column
+      if current_r == other_r
+        if current_c > other_c
+          l << other_square
+        elsif current_c < other_c
+          r << other_square
+        end
+      end
+      if current_c == other_c
+        if current_r > other_r
+          d << other_square
+        elsif current_r < other_r
+          u << other_square
+        end
+      end
+    end
+
+    # Extract from ru array only empty squares + first square with an enemy piece, as
+    # queens cannot jump other pieces
+    valid_ru = ru.take_while { |sq| sq.piece.nil? }
+    ru -= valid_ru
+    valid_ru << ru.first
+
+    # From rd array
+    valid_rd = rd.take_while { |sq| sq.piece.nil? }
+    rd -= valid_rd
+    valid_rd << rd.first
+
+    # From ld array
+    valid_ld = ld.take_while { |sq| sq.piece.nil? }
+    ld -= valid_ld
+    valid_ld << ld.first
+
+    # From lu array
+    valid_lu = lu.take_while { |sq| sq.piece.nil? }
+    lu -= valid_lu
+    valid_lu << lu.first
+
+    # From l array
+    l.sort! { |a, b| b.coord <=> a.coord }
+    valid_l = l.take_while { |sq| sq.piece.nil? }
+    l -= valid_l
+    valid_l << l.first
+
+    # From r array
+    r.sort! { |a, b| a.coord <=> b.coord }
+    valid_r = r.take_while { |sq| sq.piece.nil? }
+    r -= valid_r
+    valid_r << r.first
+
+    # From u array
+    u.sort! { |a, b| a.coord <=> b.coord }
+    valid_u = u.take_while { |sq| sq.piece.nil? }
+    u -= valid_u
+    valid_u << u.first
+
+    # From d array
+    d.sort! { |a, b| b.coord <=> a.coord }
+    valid_d = d.take_while { |sq| sq.piece.nil? }
+    d -= valid_d
+    valid_d << d.first
+
+
+    # Add all valid moves to array
+    valid = [valid_ru, valid_rd, valid_ld, valid_lu, valid_l, valid_r, valid_u, valid_d].flatten.compact
+    valid.select! { |sq| sq.piece ? sq.piece.team != @team : sq }
+    all_squares.each do |other_square|
+      @valid_moves << other_square if valid.include?(other_square)
+    end
   end
 end
 
@@ -260,5 +406,19 @@ class King < Piece
   end
 
   def update_valid_moves(all_squares)
+    # Reset
+    @valid_moves = []
+    c = %w[A B C D E F G H]
+    current_c_ind = c.index(@square.column)
+    current_r = @square.row
+    transformations = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]
+
+    transformations.each do |t|
+      if (current_c_ind + t[0]).between?(0, 7) && (current_r + t[1]).between?(1, 8)
+        @valid_moves << find("#{c[current_c_ind + t[0]]}#{current_r + t[1]}", all_squares)
+      end
+    end
+
+    @valid_moves.select! { |sq| sq.piece ? sq.piece.team != @team : sq }
   end
 end
