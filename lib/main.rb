@@ -3,16 +3,6 @@ require_relative 'player'
 require_relative 'game'
 
 test = Game.new
-test.display_board
-puts "---"
-
-pieceA8 = test.board.flatten.first.piece
-test.update_moves_all_pieces
-if pieceA8.valid_moves.empty?
-  puts "empty"
-else
-  puts pieceA8.valid_moves
-end
 
 c4 = test.find_square_by_coordinates("C4")
 c4.piece = Rook.new('rook', 'team_one', c4)
@@ -30,9 +20,10 @@ d6 = test.find_square_by_coordinates("D6")
 d6.piece = Queen.new('queen', 'team_two', d6)
 d5 = test.find_square_by_coordinates("D5")
 d5.piece = King.new('king', 'team_one', d5)
-test.display_board
 
+test.display_board
 test.update_moves_all_pieces
+
 print 'c4 rook valid moves '
 c4.piece.valid_moves.each { |sq| print "#{sq.coord} " }
 puts ''

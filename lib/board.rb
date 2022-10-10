@@ -11,10 +11,6 @@ class Square
     @row = row
     @styling = color == 'green' ? "\e[102m" : "\e[47m"
     @piece = nil
-    @verticals = []
-    @horizontals = []
-    @diagonals = []
-    @knight_moves = []
   end
 end
 
@@ -28,7 +24,6 @@ class BoardCreator
 
   def create_board
     game_board = [[], [], [], [], [], [], [], []]
-
     # Populate the board subarrays (each representing a board row) with
     # Square objects, and assign each Square a color and coordinate
     color = 'green'
