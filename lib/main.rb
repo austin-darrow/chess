@@ -4,7 +4,6 @@ require_relative 'game'
 
 test = Game.new
 test.display_board
-# test.update_pawn_moves
 puts "---"
 
 pieceA8 = test.board.flatten.first.piece
@@ -21,8 +20,6 @@ f4 = test.find_square_by_coordinates("F4")
 f4.piece = Pawn.new('pawn', 'team_two', f4)
 f3 = test.find_square_by_coordinates("F3")
 f3.piece = Pawn.new('pawn', 'team_two', f3)
-# b4 = test.find_square_by_coordinates("B4")
-# b4.piece = Pawn.new('pawn', 'team_one', b4)
 e5 = test.find_square_by_coordinates("E5")
 e5.piece = Knight.new('knight', 'team_two', e5)
 f2 = test.find_square_by_coordinates("F2")
@@ -42,9 +39,6 @@ puts ''
 print 'e5 knight valid moves '
 e5.piece.valid_moves.each { |sq| print "#{sq.coord} " }
 puts ''
-# print 'b4 pawn valid moves '
-# b4.piece.valid_moves.each { |sq| print "#{sq.coord} " }
-# puts ''
 print 'f2 pawn valid moves '
 f2.piece.valid_moves.each { |sq| print "#{sq.coord} " }
 puts ''
