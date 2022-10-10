@@ -274,7 +274,7 @@ class Bishop < Piece
     # From lu array
     valid_lu = lu.take_while { |sq| sq.piece.nil? }
     lu -= valid_lu
-    valid_lu << lu
+    valid_lu << lu.first
 
     # Add all valid moves to array
     valid = [valid_ru, valid_rd, valid_ld, valid_lu].flatten.compact

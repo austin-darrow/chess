@@ -18,42 +18,72 @@ class Game
       update_moves_all_pieces
       if @current_player.all_valid_moves.empty?
         game_over = true
-        @current_player == @player1 ? @player2 : @player1
+        @current_player = @current_player == @player1 ? @player2 : @player1
       else
-        # Make a move
+        display_board
+        make_move
         # Check & apply special conditions (pawn transform, en passant)
         display_board
-        @current_player == @player1 ? @player2 : @player1
+        @current_player = @current_player == @player1 ? @player2 : @player1
       end
     end
     puts '=========================================='
     puts '===============GAME OVER=================='
-    puts "=============#{@current_player.player} wins!=================="
+    puts "=============#{@current_player.name} wins!==============="
     puts '=========================================='
   end
 
   def make_move
-    puts "#{current_player.player}, enter coordinates of a piece to move:"
+    print "#{@current_player.name}, enter coordinates of a piece to move: "
     piece_coord = gets.chomp.upcase
-    # Make sure it's a piece of that player's team + it has valid moves to make
-    piece = find_square_by_coordinates(piece_coord)
+    piece_coord = gets.chomp.upcase until validate_piece(piece_coord)
+    piece = find_square_by_coordinates(piece_coord).piece
 
-    puts "#{piece_coord} #{piece.type} can make the following moves:"
-    piece.valid_moves.each { |move| print "#{move.coord} "}
+    print "#{piece_coord} #{piece.type} can make the following moves: "
+    piece.valid_moves.each { |move| print "#{move.coord} " }
 
-    puts "#{current_player.player}, enter destination coordinates:"
+    print "\n#{@current_player.name}, enter destination coordinates: "
     destination_coord = gets.chomp.upcase
-    # Double check what is entered
+    destination_coord = gets.chomp.upcase until validate_destination(destination_coord, piece)
+
+    update_board(piece, destination_coord)
   end
 
-  # def validate_piece(coord)
-  #   square = find_square_by_coordinates(coord)
-  #   if square
-  #   piece = square.piece if square.piece
-  #   return unless piece && piece.team == @current_player.team && piece.valid_moves.any?
+  def update_board(piece, destination_coord)
+    destination_square = find_square_by_coordinates(destination_coord)
 
-  #   puts 'Invalid entry. Please enter coordinates of a valid piece:'
-  # end
+    destination_square.piece = piece
+    piece.square.piece = nil
+    piece.square = destination_square
+
+    piece.total_moves += 1
+  end
+
+  def validate_piece(coord)
+    display_board
+    square = find_square_by_coordinates(coord)
+    if square.nil? || square.piece.nil?
+      print "Invalid coordinates. Enter valid coordinates: "
+    elsif square.piece.team != @current_player.team
+      print "Invalid entry. Enter coordinates of a piece you control: "
+    elsif square.piece.valid_moves.empty?
+      print "Invalid entry. That piece has no valid moves. Try another: "
+    else
+      true
+    end
+  end
+
+  def validate_destination(coord, piece)
+    display_board
+    destination_square = find_square_by_coordinates(coord)
+    if piece.valid_moves.include?(destination_square)
+      true
+    else
+      print "Invalid entry. Valid moves include: "
+      piece.valid_moves.each { |square| print "#{square.coord} " }
+      print "\nEnter a valid move for #{piece.square.coord} #{piece.type}: "
+    end
+  end
 
   def protect_king
     # Update valid moves--if you are in check, only keep moves if it would get out of check.
