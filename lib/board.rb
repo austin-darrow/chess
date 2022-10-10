@@ -24,7 +24,6 @@ class BoardCreator
 
   def create_board
     game_board = [[], [], [], [], [], [], [], []]
-
     # Populate the board subarrays (each representing a board row) with
     # Square objects, and assign each Square a color and coordinate
     color = 'green'
