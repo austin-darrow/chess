@@ -7,8 +7,8 @@ class Game
 
   def initialize
     @board = BoardCreator.new.game_board
-    @player1 = Player.new('team_one')
-    @player2 = Player.new('team_two')
+    @player1 = Player.new('team_one', 'Player 1')
+    @player2 = Player.new('team_two', 'Player 2')
     @current_player = @player1
   end
 
@@ -18,6 +18,7 @@ class Game
       update_moves_all_pieces
       if @current_player.all_valid_moves.empty?
         game_over = true
+        @current_player == @player1 ? @player2 : @player1
       else
         # Make a move
         # Check & apply special conditions (pawn transform, en passant)
@@ -27,8 +28,32 @@ class Game
     end
     puts '=========================================='
     puts '===============GAME OVER=================='
+    puts "=============#{@current_player.player} wins!=================="
     puts '=========================================='
   end
+
+  def make_move
+    puts "#{current_player.player}, enter coordinates of a piece to move:"
+    piece_coord = gets.chomp.upcase
+    # Make sure it's a piece of that player's team + it has valid moves to make
+    piece = find_square_by_coordinates(piece_coord)
+
+    puts "#{piece_coord} #{piece.type} can make the following moves:"
+    piece.valid_moves.each { |move| print "#{move.coord} "}
+
+    puts "#{current_player.player}, enter destination coordinates:"
+    destination_coord = gets.chomp.upcase
+    # Double check what is entered
+  end
+
+  # def validate_piece(coord)
+  #   square = find_square_by_coordinates(coord)
+  #   if square
+  #   piece = square.piece if square.piece
+  #   return unless piece && piece.team == @current_player.team && piece.valid_moves.any?
+
+  #   puts 'Invalid entry. Please enter coordinates of a valid piece:'
+  # end
 
   def protect_king
     # Update valid moves--if you are in check, only keep moves if it would get out of check.
@@ -58,12 +83,15 @@ class Game
         pieces_copy.each { |p_copy| p_copy.update_valid_moves(board_copy.flatten) }
         other_team_moves_copy = []
         pieces_copy.each do |p|
-          p.valid_moves.each { |m| other_team_moves_copy << m } unless p.team == @current_player.team
+          next if p.team == @current_player.team
+
+          p.valid_moves.each { |m| other_team_moves_copy << m }
         end
 
         # If king is in check after making the potential move, it's an illegal move. Exclude from @valid_moves
-        current_team_king_copy = pieces_copy.select { |piece| piece.type == 'king' }.first
-        unless other_team_moves_copy.include?(current_team_king_copy)
+        current_team_king_copy = pieces_copy.select { |pc| pc.type == 'king' && pc.team == @current_player.team }.first
+        king_square = board_copy.flatten.select { |s| s.piece == current_team_king_copy }.first
+        unless other_team_moves_copy.include?(king_square)
           new_valid << move
           @current_player.all_valid_moves << move
         end

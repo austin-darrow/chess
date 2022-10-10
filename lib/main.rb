@@ -48,3 +48,10 @@ puts ''
 print 'd5 king valid moves '
 d5.piece.valid_moves.each { |sq| print "#{sq.coord} " }
 puts ''
+
+# board_copy = Marshal.load(Marshal.dump(test.board))
+# copy_a1 = board_copy.flatten.select { |sq| sq.coord == 'A1' }.first
+# a1 = test.find_square_by_coordinates("A1")
+# puts copy_a1.piece
+# puts a1.piece
+# puts copy_a1 == a1
