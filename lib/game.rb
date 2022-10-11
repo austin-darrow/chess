@@ -50,6 +50,7 @@ class Game
 
     double_move(piece, destination_coord)
     en_passant(piece, destination_coord)
+    castle(piece, destination_coord)
     update_board(piece, destination_coord)
     transform_pawn(piece, destination_coord)
   end
@@ -106,15 +107,28 @@ class Game
     end
   end
 
+  def castle(piece, destination_coord)
+    dest_sq = find_square_by_coordinates(destination_coord)
+    if piece.type == 'king' && dest_sq == piece.left_castle
+      piece.left_rook_destination.piece = piece.left_rook_square.piece
+      piece.left_rook_square.piece = nil
+      piece.left_rook_destination.piece.square = piece.left_rook_destination
+    elsif piece.type == 'king' && dest_sq == piece.right_castle
+      piece.right_rook_destination.piece = piece.right_rook_square.piece
+      piece.right_rook_square.piece = nil
+      piece.right_rook_destination.piece.square = piece.right_rook_destination
+    end
+  end
+
   def validate_piece(coord)
     display_board
     square = find_square_by_coordinates(coord)
     if square.nil? || square.piece.nil?
-      print "Invalid coordinates. Enter valid coordinates: "
+      print "Invalid coordinates. #{@current_player.name}, choose a valid piece: "
     elsif square.piece.team != @current_player.team
-      print "Invalid entry. Enter coordinates of a piece you control: "
+      print "Invalid entry. #{@current_player.name}, enter coordinates of a piece you control: "
     elsif square.piece.valid_moves.empty?
-      print "Invalid entry. That piece has no valid moves. Try another: "
+      print "Invalid entry. That piece has no valid moves. #{@current_player.name}, try another: "
     else
       true
     end
@@ -128,11 +142,11 @@ class Game
     else
       print "Invalid entry. Valid moves include: "
       piece.valid_moves.each { |square| print "#{square.coord} " }
-      print "\nEnter a valid move for #{piece.square.coord} #{piece.type}: "
+      print "\n#{@current_player.name}, enter a valid move for #{piece.square.coord} #{piece.type}: "
     end
   end
 
-  def protect_king
+  def check_checkmate
     @current_player.all_valid_moves = []
     team_pieces = get_pieces.select { |piece| piece.team == @current_player.team }
     team_pieces.each do |piece|
@@ -196,7 +210,7 @@ class Game
   def update_moves_all_pieces
     pieces = get_pieces
     pieces.each { |piece| piece.update_valid_moves(@board.flatten) }
-    protect_king
+    check_checkmate
   end
 
   def display_board

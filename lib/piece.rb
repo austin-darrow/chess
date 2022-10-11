@@ -19,7 +19,8 @@ end
 # =========================================================================
 
 class Pawn < Piece
-  attr_accessor :double_moved, :final_row, :en_passant_piece, :en_passant_square, :en_passant_destination, :double_move
+  attr_accessor :double_moved, :final_row, :en_passant_piece, :en_passant_square,
+                :en_passant_destination, :double_move
 
   def initialize(type, team, square)
     super
@@ -432,9 +433,18 @@ end
 # =========================================================================
 
 class King < Piece
+  attr_accessor :left_castle, :left_rook_destination, :left_rook_square,
+                :right_castle, :right_rook_destination, :right_rook_square
+
   def initialize(type, team, square)
     super
     @board_piece = @team == 'team_one' ? '♔' : "\u001b[31m♚"
+    @left_castle = nil
+    @left_rook_square = nil
+    @left_rook_destination = nil
+    @right_castle = nil
+    @right_rook_square = nil
+    @right_rook_destination = nil
   end
 
   def update_valid_moves(all_squares)
@@ -451,6 +461,78 @@ class King < Piece
       end
     end
 
+    # Select only moves that don't include same team pieces
     @valid_moves.select! { |sq| sq.piece ? sq.piece.team != @team : sq }
+
+    # Castle special move
+    if @total_moves > 0
+      @left_castle = nil
+      @right_castle = nil
+      return
+    end
+
+    enemy_moves = []
+    pieces = []
+    all_squares.each do |sq|
+      next if sq.piece.nil?
+      pieces << sq.piece
+    end
+    enemy_pieces = pieces.select { |p| p.team != @team }
+    enemy_pieces.each { |p| p.valid_moves.each { |move| enemy_moves << move } }
+    if @team == 'team_one'
+      l = [find("#{c[current_c_ind - 1]}#{current_r}", all_squares),
+           find("#{c[current_c_ind - 2]}#{current_r}", all_squares),
+           find("#{c[current_c_ind - 3]}#{current_r}", all_squares),
+           find("#{c[current_c_ind - 4]}#{current_r}", all_squares)]
+      l_rook = l[3].piece if l[3].piece
+      if l[0..2].all? { |sq| sq.piece.nil? } && l_rook && l_rook.total_moves.zero? &&
+         @total_moves.zero? && l[0..1].each { |sq| enemy_moves.none?(sq) } &&
+         enemy_moves.none?(@square)
+        @left_castle = l[1]
+        @valid_moves << l[1]
+        @left_rook_square = l_rook.square
+        @left_rook_destination = l[0]
+      end
+
+      r = [find("#{c[current_c_ind + 1]}#{current_r}", all_squares),
+           find("#{c[current_c_ind + 2]}#{current_r}", all_squares),
+           find("#{c[current_c_ind + 3]}#{current_r}", all_squares)]
+      r_rook = r[2].piece if l[2].piece
+      if r[0..1].all? { |sq| sq.piece.nil? } && r_rook && r_rook.total_moves.zero? &&
+         @total_moves.zero? && r[0..1].each { |sq| enemy_moves.none?(sq) } &&
+         enemy_moves.none?(@square)
+        @right_castle = r[1]
+        @valid_moves << r[1]
+        @right_rook_square = r_rook.square
+        @right_rook_destination = r[0]
+      end
+    elsif @team == 'team_two'
+      l = [find("#{c[current_c_ind - 1]}#{current_r}", all_squares),
+           find("#{c[current_c_ind - 2]}#{current_r}", all_squares),
+           find("#{c[current_c_ind - 3]}#{current_r}", all_squares)]
+      l_rook = l[2].piece if l[2].piece
+      if l[0..1].all? { |sq| sq.piece.nil? } && l_rook && l_rook.total_moves.zero? &&
+         @total_moves.zero? && l[0..1] { |sq| enemy_moves.none?(sq) } &&
+         enemy_moves.none?(@square)
+        @left_castle = l[1]
+        @valid_moves << l[1]
+        @left_rook_square = l_rook.square
+        @left_rook_destination = l[0]
+      end
+
+      r = [find("#{c[current_c_ind + 1]}#{current_r}", all_squares),
+           find("#{c[current_c_ind + 2]}#{current_r}", all_squares),
+           find("#{c[current_c_ind + 3]}#{current_r}", all_squares),
+           find("#{c[current_c_ind + 4]}#{current_r}", all_squares)]
+      r_rook = r[3].piece if r[3].piece
+      if r[0..2].all? { |sq| sq.piece.nil? } && r_rook && r_rook.total_moves.zero? &&
+         @total_moves.zero? && r[0..1] { |sq| enemy_moves.none?(sq) } &&
+         enemy_moves.none?(@square)
+        @right_castle = r[1]
+        @valid_moves << r[1]
+        @right_rook_square = r_rook.square
+        @right_rook_destination = r[0]
+      end
+    end
   end
 end
