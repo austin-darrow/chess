@@ -1,5 +1,6 @@
 require_relative 'board'
 require_relative 'player'
+require_relative 'piece'
 
 class Game
   attr_accessor :board, :current_player
@@ -7,6 +8,7 @@ class Game
 
   def initialize
     @board = BoardCreator.new.game_board
+    display_board
     @player1 = Player.new('team_one', 'Player 1')
     @player2 = Player.new('team_two', 'Player 2')
     @current_player = @player1
@@ -46,7 +48,10 @@ class Game
     destination_coord = gets.chomp.upcase
     destination_coord = gets.chomp.upcase until validate_destination(destination_coord, piece)
 
+    double_move(piece, destination_coord)
+    en_passant(piece, destination_coord)
     update_board(piece, destination_coord)
+    transform_pawn(piece, destination_coord)
   end
 
   def update_board(piece, destination_coord)
@@ -57,6 +62,48 @@ class Game
     piece.square = destination_square
 
     piece.total_moves += 1
+  end
+
+  def double_move(piece, destination_coord)
+    if piece.type == 'pawn'
+      piece.double_moved = false
+      if find_square_by_coordinates(destination_coord) == piece.double_move
+        piece.double_moved = true
+      end
+    end
+  end
+
+  def en_passant(piece, destination_coord)
+    if piece.type == 'pawn' && piece.en_passant_square
+      if find_square_by_coordinates(destination_coord) == piece.en_passant_destination
+        piece.en_passant_square.piece = nil
+        piece.en_passant_square = nil
+      end
+    end
+  end
+
+  def transform_pawn(piece, destination_coord)
+    if piece.type == 'pawn' && find_square_by_coordinates(destination_coord) == piece.final_row
+      puts "What do you want to transform your pawn into?"
+      puts "Queen = 'q' | Bishop = 'b' | Knight = 'k' | Rook = 'r'"
+      valid_responses = %w[q b k r]
+      response = gets.chomp.downcase
+      until valid_responses.include?(response)
+        puts "Invalid entry"
+        response = gets.chomp.downcase
+      end
+
+      case response
+      when 'q'
+        piece.square.piece = Queen.new('queen', @current_player.team, piece.square)
+      when 'b'
+        piece.square.piece = Bishop.new('bishop', @current_player.team, piece.square)
+      when 'k'
+        piece.square.piece = Knight.new('knight', @current_player.team, piece.square)
+      when 'r'
+        piece.square.piece = Rook.new('rook', @current_player.team, piece.square)
+      end
+    end
   end
 
   def validate_piece(coord)
@@ -86,48 +133,48 @@ class Game
   end
 
   def protect_king
-    # Update valid moves--if you are in check, only keep moves if it would get out of check.
-    # If not in check, only keep moves if it wouldn't put you in check.
     @current_player.all_valid_moves = []
     team_pieces = get_pieces.select { |piece| piece.team == @current_player.team }
     team_pieces.each do |piece|
       # Check if each move would put king in check or can get king out of check.
       new_valid = []
       piece.valid_moves.each do |move|
-        # Make a test copy of the board, its pieces, this current piece, and the potential move
-        board_copy = Marshal.load(Marshal.dump(@board))
-        pieces_copy = []
-        board_copy.flatten.each do |square|
-          next if square.piece.nil?
-          pieces_copy << square.piece
-        end
-        piece_copy = pieces_copy.select { |p| p.square.coord == piece.square.coord }.first
-        move_copy = board_copy.flatten.select { |sq| sq.coord == move.coord }.first
+        # Implement the move just to test it out
+        piece.square.piece = nil
+        saved_square = piece.square
+        saved_piece = move.piece unless move.piece.nil?
+        move.piece = piece
+        piece.square = move
 
-        # Implement the move on the fake test board
-        move_copy.piece = piece_copy
-        piece_copy.square.piece = nil
-        piece_copy.square = move_copy
+        # Update opposing team moves
+        opposing_team_pieces = get_pieces.select { |p| p.team != @current_player.team }
+        opposing_team_pieces.each { |p| p.update_valid_moves(@board.flatten) }
 
-        # Update valid moves with new board state
-        pieces_copy.each { |p_copy| p_copy.update_valid_moves(board_copy.flatten) }
-        other_team_moves_copy = []
-        pieces_copy.each do |p|
+        # Determine if the king is now in check
+        king = team_pieces.select { |p| p.type == 'king' }.first
+        opposing_team_moves = []
+        get_pieces.each do |p|
           next if p.team == @current_player.team
-
-          p.valid_moves.each { |m| other_team_moves_copy << m }
+          p.valid_moves.each { |m| opposing_team_moves << m }
         end
 
-        # If king is in check after making the potential move, it's an illegal move. Exclude from @valid_moves
-        current_team_king_copy = pieces_copy.select { |pc| pc.type == 'king' && pc.team == @current_player.team }.first
-        king_square = board_copy.flatten.select { |s| s.piece == current_team_king_copy }.first
-        unless other_team_moves_copy.include?(king_square)
+        # If not, keep the move
+        unless opposing_team_moves.include?(king.square)
           new_valid << move
           @current_player.all_valid_moves << move
         end
+
+        # Undo the move now that testing is finished
+        if saved_piece
+          move.piece = saved_piece
+        else
+          move.piece = nil
+        end
+        saved_square.piece = piece
+        piece.square = saved_square
       end
 
-      # Finally, update @valid_moves on the real board
+      # Update @valid_moves with only the moves that would protect king from check/checkmate
       piece.valid_moves = new_valid
     end
   end

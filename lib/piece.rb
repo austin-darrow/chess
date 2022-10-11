@@ -19,13 +19,16 @@ end
 # =========================================================================
 
 class Pawn < Piece
-  attr_accessor :double_moved, :final_row
+  attr_accessor :double_moved, :final_row, :en_passant_piece, :en_passant_square, :en_passant_destination, :double_move
 
   def initialize(type, team, square)
     super
     @board_piece = @team == 'team_one' ? "♙" : "\u001b[31m♟"
+    @double_move = nil
     @double_moved = false
-    @final_row = false
+    @en_passant_square = nil
+    @en_passant_destination = nil
+    @final_row = nil
   end
 
   def update_valid_moves(all_squares)
@@ -39,59 +42,79 @@ class Pawn < Piece
     if @team == 'team_one'
       # Normal move 1
       square_above = find("#{current_column}#{current_row + 1}", all_squares)
-      @valid_moves << square_above if square_above.piece.nil?
+      @valid_moves << square_above if square_above && square_above.piece.nil?
 
       # Move 2 if pawn hasn't moved yet
       if @total_moves.zero?
         two_above = find("#{current_column}#{current_row + 2}", all_squares)
         @valid_moves << two_above if two_above.piece.nil? && square_above.piece.nil?
+        @double_move = two_above
       end
 
       # Capture enemy pieces if in diagonals 1 away
-      left_up_diag = find("#{c[current_c_ind - 1]}#{current_row + 1}", all_squares)
-      unless left_up_diag.nil? || left_up_diag.piece.nil? || left_up_diag.piece.team == @team
-        @valid_moves << left_up_diag
+      if (current_c_ind - 1) > -1 && (current_row + 1) < 9
+        left_up_diag = find("#{c[current_c_ind - 1]}#{current_row + 1}", all_squares)
+        unless left_up_diag.nil? || left_up_diag.piece.nil? || left_up_diag.piece.team == @team
+          @valid_moves << left_up_diag
+        end
       end
-      right_up_diag = find("#{c[current_c_ind + 1]}#{current_row + 1}", all_squares)
-      unless right_up_diag.nil? || right_up_diag.piece.nil? || right_up_diag.piece.team == @team
-        @valid_moves << right_up_diag
+      if (current_c_ind + 1) < 8 && (current_row + 1) < 9
+        right_up_diag = find("#{c[current_c_ind + 1]}#{current_row + 1}", all_squares)
+        unless right_up_diag.nil? || right_up_diag.piece.nil? || right_up_diag.piece.team == @team
+          @valid_moves << right_up_diag
+        end
       end
+
       # En passant special move
       l = find("#{c[current_c_ind - 1]}#{current_row}", all_squares)
       r = find("#{c[current_c_ind + 1]}#{current_row}", all_squares)
       [l, r].each do |side|
         unless side.nil? || side.piece.nil? || side.piece.team == @team
           if side.piece.type == 'pawn' && side.piece.double_moved == true
-            @valid_moves << right_up_diag if side == r
-            @valid_moves << left_up_diag if side == l
+            if side == r
+              @valid_moves << right_up_diag
+              @en_passant_square = r
+              @en_passant_destination = right_up_diag
+            elsif side == l
+              @valid_moves << left_up_diag
+              @en_passant_square = l
+              @en_passant_destination = left_up_diag
+            end
           end
         end
       end
 
       # Transform if pawn moves to final row
-      if @square.row == 8
-        @final_row = true
+      @valid_moves.each do |square|
+        if square && square.row == 8
+          @final_row = square
+        end
       end
 
     elsif @team == 'team_two'
       # Normal move 1
       square_below = find("#{current_column}#{current_row - 1}" , all_squares)
-      @valid_moves << square_below if square_below.piece.nil?
+      @valid_moves << square_below if square_below && square_below.piece.nil?
 
       # Move 2 if pawn hasn't moved yet
       if @total_moves.zero?
         two_below = find("#{current_column}#{current_row - 2}" , all_squares)
         @valid_moves << two_below if two_below.piece.nil? && square_below.piece.nil?
+        @double_move = two_below
       end
 
       # Capture enemy pieces if in diagonals 1 away
-      left_down_diag = find("#{c[current_c_ind - 1]}#{current_row - 1}" , all_squares)
-      unless left_down_diag.nil? || left_down_diag.piece.nil? || left_down_diag.piece.team == @team
-        @valid_moves << left_down_diag
+      if (current_c_ind - 1) > -1 && (current_row - 1) > 0
+        left_down_diag = find("#{c[current_c_ind - 1]}#{current_row - 1}" , all_squares)
+        unless left_down_diag.nil? || left_down_diag.piece.nil? || left_down_diag.piece.team == @team
+          @valid_moves << left_down_diag
+        end
       end
-      right_down_diag = find("#{c[current_c_ind + 1]}#{current_row - 1}" , all_squares)
-      unless right_down_diag.nil? || right_down_diag.piece.nil? || right_down_diag.piece.team == @team
-        @valid_moves << right_down_diag
+      if (current_c_ind + 1) < 8 && (current_row - 1) > 0
+        right_down_diag = find("#{c[current_c_ind + 1]}#{current_row - 1}" , all_squares)
+        unless right_down_diag.nil? || right_down_diag.piece.nil? || right_down_diag.piece.team == @team
+          @valid_moves << right_down_diag
+        end
       end
 
       # En passant special move
@@ -100,15 +123,24 @@ class Pawn < Piece
       [l, r].each do |side|
         unless side.nil? || side.piece.nil? || side.piece.team == @team
           if side.piece.type == 'pawn' && side.piece.double_moved == true
-            @valid_moves << right_down_diag if side == r
-            @valid_moves << left_down_diag if side == l
+            if side == r
+              @valid_moves << right_down_diag
+              @en_passant_square = r
+              @en_passant_destination = right_down_diag
+            elsif side == l
+              @valid_moves << left_down_diag
+              @en_passant_square = l
+              @en_passant_destination = left_down_diag
+            end
           end
         end
       end
 
       # Transform if pawn moves to final row
-      if @square.row == 1
-        @final_row = true
+      @valid_moves.each do |square|
+        if square && square.row == 1
+          @final_row = square
+        end
       end
     end
   end

@@ -19,8 +19,10 @@ test.play_game
 # d4.piece = Bishop.new('bishop', 'team_one', d4)
 # d6 = test.find_square_by_coordinates("D6")
 # d6.piece = Queen.new('queen', 'team_two', d6)
-# d5 = test.find_square_by_coordinates("D5")
-# d5.piece = King.new('king', 'team_one', d5)
+# # d5 = test.find_square_by_coordinates("D5")
+# # d5.piece = King.new('king', 'team_one', d5)
+# b6 = test.find_square_by_coordinates("B6")
+# b6.piece = Pawn.new('pawn', 'team_one', b6)
 
 # test.display_board
 # test.update_moves_all_pieces
@@ -45,6 +47,9 @@ test.play_game
 # puts ''
 # print 'd6 queen valid moves '
 # d6.piece.valid_moves.each { |sq| print "#{sq.coord} " }
+# puts ''
+# print 'b6 pawn valid moves '
+# b6.piece.valid_moves.each { |sq| print "#{sq.coord} " }
 # puts ''
 # print 'd5 king valid moves '
 # d5.piece.valid_moves.each { |sq| print "#{sq.coord} " }
