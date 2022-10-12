@@ -29,10 +29,8 @@ class Game
         @current_player = @current_player == @player1 ? @player2 : @player1
       end
     end
-    puts '=========================================='
-    puts '===============GAME OVER=================='
-    puts "=============#{@current_player.name} wins!==============="
-    puts '=========================================='
+    puts 'GAME OVER'
+    puts "#{@current_player.name} wins!"
   end
 
   def make_move
@@ -221,9 +219,9 @@ class Game
       display = ''
       row.each do |square|
         if square.piece.nil?
-          display << "#{square.styling}   "
+          display << "#{square.styling}   \e[0m"
         else
-          display << "#{square.styling} #{square.piece.board_piece} "
+          display << "#{square.styling} #{square.piece.board_piece} \e[0m"
         end
       end
       puts "#{n} #{display}\e[0m #{n}"
