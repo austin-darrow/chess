@@ -67,6 +67,8 @@ class Piece
   def clean_valid_moves(*unclean)
     valid = [unclean].flatten.compact
     valid.select! { |sq| sq.piece ? sq.piece.team != @team : sq }
+    valid.flatten.compact
+    valid
   end
 end
 
@@ -75,7 +77,7 @@ end
 
 class Pawn < Piece
   attr_accessor :double_moved, :final_row, :en_passant_piece, :en_passant_square,
-                :en_passant_destination, :double_move
+                :en_passant_destination, :double_move, :total_moves_when_double_moved
 
   def initialize(type, team, square)
     super
@@ -85,115 +87,76 @@ class Pawn < Piece
     @en_passant_square = nil
     @en_passant_destination = nil
     @final_row = nil
+    @total_moves_when_double_moved = nil
   end
 
-  def update_valid_moves(all_squares)
-    # Reset
-    @valid_moves = []
-
+  def update_valid_moves(all_squares, other_player)
+    @valid_moves = [] # Reset
     if @team == 'team_one'
-      # Normal move 1
-      square_above = find("#{@square.column}#{@square.row + 1}", all_squares)
-      @valid_moves << square_above if square_above && square_above.piece.nil?
-
-      # Move 2 if pawn hasn't moved yet
-      if @total_moves.zero?
-        two_above = find("#{@square.column}#{@square.row + 2}", all_squares)
-        @valid_moves << two_above if two_above.piece.nil? && square_above.piece.nil?
-        @double_move = two_above
-      end
-
-      # Capture enemy pieces if in diagonals 1 away
-      if (C.index(@square.column) - 1) > -1 && (@square.row + 1) < 9
-        l_diag = find("#{C[C.index(@square.column) - 1]}#{@square.row + 1}", all_squares)
-        unless l_diag.nil? || l_diag.piece.nil? || l_diag.piece.team == @team
-          @valid_moves << l_diag
-        end
-      end
-      if (C.index(@square.column) + 1) < 8 && (@square.row + 1) < 9
-        r_diag = find("#{C[C.index(@square.column) + 1]}#{@square.row + 1}", all_squares)
-        unless r_diag.nil? || r_diag.piece.nil? || r_diag.piece.team == @team
-          @valid_moves << r_diag
-        end
-      end
-
-      # En passant special move
-      l = find("#{C[C.index(@square.column) - 1]}#{@square.row}", all_squares)
-      r = find("#{C[C.index(@square.column) + 1]}#{@square.row}", all_squares)
-      [l, r].each do |side|
-        unless side.nil? || side.piece.nil? || side.piece.team == @team
-          if side.piece.type == 'pawn' && side.piece.double_moved == true
-            if side == r
-              @valid_moves << r_diag
-              @en_passant_square = r
-              @en_passant_destination = r_diag
-            elsif side == l
-              @valid_moves << l_diag
-              @en_passant_square = l
-              @en_passant_destination = l_diag
-            end
-          end
-        end
-      end
-
-      # Transform if pawn moves to final row
-      @valid_moves.each do |square|
-        if square && square.row == 8
-          @final_row = square
-        end
-      end
-
+      row_adj_1 = 1
+      row_adj_2 = 2
+      final_row = 8
     elsif @team == 'team_two'
-      # Normal move 1
-      square_below = find("#{@square.column}#{@square.row - 1}" , all_squares)
-      @valid_moves << square_below if square_below && square_below.piece.nil?
+      row_adj_1 = -1
+      row_adj_2 = -2
+      final_row = 1
+    end
 
-      # Move 2 if pawn hasn't moved yet
-      if @total_moves.zero?
-        two_below = find("#{@square.column}#{@square.row - 2}" , all_squares)
-        @valid_moves << two_below if two_below.piece.nil? && square_below.piece.nil?
-        @double_move = two_below
-      end
+    # Normal move 1
+    square_above = find("#{@square.column}#{@square.row + row_adj_1}", all_squares)
+    @valid_moves << square_above if square_above && square_above.piece.nil?
 
-      # Capture enemy pieces if in diagonals 1 away
-      if (C.index(@square.column) - 1) > -1 && (@square.row - 1) > 0
-        l_diag = find("#{C[C.index(@square.column) - 1]}#{@square.row - 1}" , all_squares)
-        unless l_diag.nil? || l_diag.piece.nil? || l_diag.piece.team == @team
-          @valid_moves << l_diag
-        end
-      end
-      if (C.index(@square.column) + 1) < 8 && (@square.row - 1) > 0
-        r_diag = find("#{C[C.index(@square.column) + 1]}#{@square.row - 1}" , all_squares)
-        unless r_diag.nil? || r_diag.piece.nil? || r_diag.piece.team == @team
-          @valid_moves << r_diag
-        end
-      end
+    # Special_moves
+    move_two(square_above, row_adj_2, all_squares)
+    capture_diags(all_squares, row_adj_1)
+    en_passant(all_squares, other_player, row_adj_1)
+    transform_pawn(final_row)
+  end
 
-      # En passant special move
-      l = find("#{C[C.index(@square.column) - 1]}#{@square.row}", all_squares)
-      r = find("#{C[C.index(@square.column) + 1]}#{@square.row}", all_squares)
-      [l, r].each do |side|
-        unless side.nil? || side.piece.nil? || side.piece.team == @team
-          if side.piece.type == 'pawn' && side.piece.double_moved == true
-            if side == r
-              @valid_moves << r_diag
-              @en_passant_square = r
-              @en_passant_destination = r_diag
-            elsif side == l
-              @valid_moves << l_diag
-              @en_passant_square = l
-              @en_passant_destination = l_diag
-            end
-          end
-        end
-      end
+  def move_two(square_above, row_adj_2, all_squares)
+    return unless @total_moves.zero?
 
-      # Transform if pawn moves to final row
-      @valid_moves.each do |square|
-        if square && square.row == 1
-          @final_row = square
-        end
+    two_above = find("#{@square.column}#{@square.row + row_adj_2}", all_squares)
+    @valid_moves << two_above if two_above.piece.nil? && square_above.piece.nil?
+    @double_move = two_above
+  end
+
+  def capture_diags(all_squares, row_adj_1)
+    if (C.index(@square.column) - 1) > -1 && (@square.row + row_adj_1).between?(1, 8)
+      l_diag = find("#{C[C.index(@square.column) - 1]}#{@square.row + row_adj_1}", all_squares)
+      @valid_moves << l_diag unless l_diag.nil? || l_diag.piece.nil? || l_diag.piece.team == @team
+    end
+    if (C.index(@square.column) + 1) < 8 && (@square.row + row_adj_1).between?(1, 8)
+      r_diag = find("#{C[C.index(@square.column) + 1]}#{@square.row + row_adj_1}", all_squares)
+      @valid_moves << r_diag unless r_diag.nil? || r_diag.piece.nil? || r_diag.piece.team == @team
+    end
+  end
+
+  def en_passant(all_squares, other_player, row_adj_1)
+    l = find("#{C[C.index(@square.column) - 1]}#{@square.row}", all_squares)
+    r = find("#{C[C.index(@square.column) + 1]}#{@square.row}", all_squares)
+    l_diag = find("#{C[C.index(@square.column) - 1]}#{@square.row + row_adj_1}", all_squares)
+    r_diag = find("#{C[C.index(@square.column) + 1]}#{@square.row + row_adj_1}", all_squares)
+    [l, r].each do |side|
+      next if side.nil? || side.piece.nil? || side.piece.team == @team ||
+              side.piece.type != 'pawn' || side.piece.double_moved == false ||
+              side.piece.total_moves_when_double_moved != other_player.total_moves
+
+      if side == r
+        @valid_moves << r_diag
+        @en_passant_square = r
+        @en_passant_destination = r_diag
+      elsif side == l
+        @valid_moves << l_diag
+        @en_passant_square = l
+        @en_passant_destination = l_diag
       end
+    end
+  end
+
+  def transform_pawn(final_row)
+    @valid_moves.each do |square|
+      @final_row = square if square && square.row == final_row
     end
   end
 end
@@ -207,7 +170,7 @@ class Rook < Piece
     @board_piece = @team == 'team_one' ? '♖' : "\u001b[31m♜"
   end
 
-  def update_valid_moves(all_squares)
+  def update_valid_moves(all_squares, _other_player)
     @valid_moves = [] # Reset
     u, d, l, r = add_cardinal_squares(u, d, l, r, all_squares)
 
@@ -229,7 +192,7 @@ class Knight < Piece
     @board_piece = @team == 'team_one' ? '♘' : "\u001b[31m♞"
   end
 
-  def update_valid_moves(all_squares)
+  def update_valid_moves(all_squares, _other_player)
     @valid_moves = [] # Reset
 
     # Select all potential 8 squares a knight could move to unless coordinates are off the board
@@ -261,7 +224,7 @@ class Bishop < Piece
     @board_piece = @team == 'team_one' ? '♗' : "\u001b[31m♝"
   end
 
-  def update_valid_moves(all_squares)
+  def update_valid_moves(all_squares, _other_player)
     @valid_moves = [] # Reset
     lu, ld, ru, rd = add_diagonal_squares(lu, ld, ru, rd, all_squares)
 
@@ -282,7 +245,7 @@ class Queen < Piece
     @board_piece = @team == 'team_one' ? '♕' : "\u001b[31m♛"
   end
 
-  def update_valid_moves(all_squares)
+  def update_valid_moves(all_squares, _other_player)
     @valid_moves = [] # Reset
     lu, ld, ru, rd = add_diagonal_squares(lu, ld, ru, rd, all_squares)
     u, d, l, r = add_cardinal_squares(u, d, l, r, all_squares)
@@ -315,7 +278,7 @@ class King < Piece
     @right_rook_destination = nil
   end
 
-  def update_valid_moves(all_squares)
+  def update_valid_moves(all_squares, _other_player)
     @valid_moves = [] # Reset
     transformations = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]
 

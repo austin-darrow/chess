@@ -3,7 +3,7 @@ require_relative 'player'
 require_relative 'piece'
 
 class Game
-  attr_accessor :board, :current_player
+  attr_accessor :board, :current_player, :other_player
   attr_reader :player1, :player2
 
   def initialize
@@ -12,6 +12,7 @@ class Game
     @player1 = Player.new('team_one', 'Player 1')
     @player2 = Player.new('team_two', 'Player 2')
     @current_player = @player1
+    @other_player = @player2
   end
 
   def play_game
@@ -21,11 +22,13 @@ class Game
       if @current_player.all_valid_moves.empty?
         game_over = true
         @current_player = @current_player == @player1 ? @player2 : @player1
+        @other_player = @other_player == @player1 ? @player2 : @player1
       else
         display_board
         make_move
         display_board
         @current_player = @current_player == @player1 ? @player2 : @player1
+        @other_player = @other_player == @player1 ? @player2 : @player1
       end
     end
     puts 'GAME OVER'
@@ -60,13 +63,15 @@ class Game
     piece.square = destination_square
 
     piece.total_moves += 1
+    @current_player.total_moves += 1
   end
 
   def double_move(piece, destination_coord)
     if piece.type == 'pawn'
       piece.double_moved = false
-      if find_square_by_coordinates(destination_coord) == piece.double_move && piece.total_moves == 0
+      if find_square_by_coordinates(destination_coord) == piece.double_move
         piece.double_moved = true
+        piece.total_moves_when_double_moved = @current_player.total_moves + 1
       end
     end
   end
@@ -159,7 +164,7 @@ class Game
 
         # Update opposing team moves
         opposing_team_pieces = get_pieces.select { |p| p.team != @current_player.team }
-        opposing_team_pieces.each { |p| p.update_valid_moves(@board.flatten) }
+        opposing_team_pieces.each { |p| p.update_valid_moves(@board.flatten, @other_player) }
 
         # Determine if the king is now in check
         king = team_pieces.select { |p| p.type == 'king' }.first
@@ -206,7 +211,7 @@ class Game
 
   def update_moves_all_pieces
     pieces = get_pieces
-    pieces.each { |piece| piece.update_valid_moves(@board.flatten) }
+    pieces.each { |piece| piece.update_valid_moves(@board.flatten, @other_player) }
     check_checkmate
   end
 
