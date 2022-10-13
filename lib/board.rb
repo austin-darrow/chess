@@ -27,12 +27,12 @@ class BoardCreator
     # Populate the board subarrays (each representing a board row) with
     # Square objects, and assign each Square a color and coordinate
     color = 'green'
-    letters = %w[A B C D E F G H]
+    columns = %w[A B C D E F G H]
     n = 0
     game_board.each do |row|
       for i in 0..7 do
         color = (color == 'white' ? 'green' : 'white') unless i == 0
-        square = Square.new(color, "#{letters[i]}#{n + 1}", "#{letters[i]}", "#{n + 1}".to_i)
+        square = Square.new(color, "#{columns[i]}#{n + 1}", "#{columns[i]}", "#{n + 1}".to_i)
         game_board[n] << square
       end
       n += 1

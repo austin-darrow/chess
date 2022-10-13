@@ -48,6 +48,7 @@ class Game
     destination_coord = gets.chomp.upcase
     destination_coord = gets.chomp.upcase until validate_destination(destination_coord, piece)
 
+    # Check for all special moves & update the board
     double_move(piece, destination_coord)
     en_passant(piece, destination_coord)
     castle(piece, destination_coord)
@@ -58,6 +59,7 @@ class Game
   def update_board(piece, destination_coord)
     destination_square = find_square_by_coordinates(destination_coord)
 
+    # Moves the selected piece to the chosen destination. Updates old and new Squares
     destination_square.piece = piece
     piece.square.piece = nil
     piece.square = destination_square
@@ -67,6 +69,7 @@ class Game
   end
 
   def double_move(piece, destination_coord)
+    # Updates #double_moved, making this piece a target for en passant
     if piece.type == 'pawn'
       piece.double_moved = false
       if find_square_by_coordinates(destination_coord) == piece.double_move
@@ -77,6 +80,7 @@ class Game
   end
 
   def en_passant(piece, destination_coord)
+    # Removes the captured enemy pawn
     if piece.type == 'pawn' && piece.en_passant_square
       if find_square_by_coordinates(destination_coord) == piece.en_passant_destination
         piece.en_passant_square.piece = nil
@@ -110,6 +114,7 @@ class Game
   end
 
   def castle(piece, destination_coord)
+    # Moves the rook that the king is castling in
     dest_sq = find_square_by_coordinates(destination_coord)
     if piece.type == 'king' && dest_sq == piece.left_castle
       piece.left_rook_destination.piece = piece.left_rook_square.piece
@@ -123,6 +128,8 @@ class Game
   end
 
   def validate_piece(coord)
+    # Chosen coordinates must be to a valid square that contains a piece that player
+    # controls that has valid moves to make
     display_board
     square = find_square_by_coordinates(coord)
     if square.nil? || square.piece.nil?
@@ -137,6 +144,7 @@ class Game
   end
 
   def validate_destination(coord, piece)
+    # Only accepts moves that the chosen piece can legally make
     display_board
     destination_square = find_square_by_coordinates(coord)
     if piece.valid_moves.include?(destination_square)
