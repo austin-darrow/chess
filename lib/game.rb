@@ -86,7 +86,7 @@ class Game
   end
 
   def transform_pawn(piece, destination_coord)
-    if piece.type == 'pawn' && find_square_by_coordinates(destination_coord) == piece.final_row
+    if piece.type == 'pawn' && piece.final_row.any?(find_square_by_coordinates(destination_coord))
       puts "What do you want to transform your pawn into?"
       puts "Queen = 'q' | Bishop = 'b' | Knight = 'k' | Rook = 'r'"
       valid_responses = %w[q b k r]

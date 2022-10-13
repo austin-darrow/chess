@@ -1,5 +1,5 @@
 class Piece
-  attr_reader :type, :team, :board_piece, :c
+  attr_reader :type, :team, :board_piece
   attr_accessor :square, :total_moves, :valid_moves
 
   C = %w[A B C D E F G H].freeze
@@ -16,6 +16,8 @@ class Piece
     squares.select { |sq| sq.coord == coord }.first
   end
 
+  # Removes any squares beyond the first square containing a piece. Keeps that
+  # square if it's an enemy piece; omits if its the same team.
   def remove_jumps(full_array, sort = nil)
     case sort
     when 'positive'
@@ -31,7 +33,6 @@ class Piece
 
   def add_cardinal_squares(u, d, l, r, all_squares)
     u, d, l, r = [], [], [], []
-
     all_squares.each do |other_square|
       if @square.row == other_square.row
         if @square.column > other_square.column
@@ -52,7 +53,7 @@ class Piece
   end
 
   def add_diagonal_squares(lu, ld, ru, rd, all_squares)
-    lu, ld, ru, rd = [], [], [], [] # Diagonal squares
+    lu, ld, ru, rd = [], [], [], []
     for i in 1..7 do
       x = C.index(@square.column)
       y = @square.row
@@ -64,6 +65,7 @@ class Piece
     [lu, ld, ru, rd]
   end
 
+  # Flatten, remove nils, and remove pieces of the same team
   def clean_valid_moves(*unclean)
     valid = [unclean].flatten.compact
     valid.select! { |sq| sq.piece ? sq.piece.team != @team : sq }
@@ -81,62 +83,67 @@ class Pawn < Piece
 
   def initialize(type, team, square)
     super
-    @board_piece = @team == 'team_one' ? "♙" : "\u001b[31m♟"
+    @board_piece = @team == 'team_one' ? '♙' : "\u001b[31m♟"
     @double_move = nil
     @double_moved = false
     @en_passant_square = nil
     @en_passant_destination = nil
-    @final_row = nil
+    @final_row = []
     @total_moves_when_double_moved = nil
   end
 
   def update_valid_moves(all_squares, other_player)
     @valid_moves = [] # Reset
     if @team == 'team_one'
-      row_adj_1 = 1
-      row_adj_2 = 2
+      row_adj = 1
+      row_adj_two = 2
       final_row = 8
     elsif @team == 'team_two'
-      row_adj_1 = -1
-      row_adj_2 = -2
+      row_adj = -1
+      row_adj_two = -2
       final_row = 1
     end
 
+    l_diag = find("#{C[C.index(@square.column) - 1]}#{@square.row + row_adj}", all_squares)
+    r_diag = find("#{C[C.index(@square.column) + 1]}#{@square.row + row_adj}", all_squares)
+
     # Normal move 1
-    square_above = find("#{@square.column}#{@square.row + row_adj_1}", all_squares)
+    square_above = find("#{@square.column}#{@square.row + row_adj}", all_squares)
     @valid_moves << square_above if square_above && square_above.piece.nil?
 
     # Special_moves
-    move_two(square_above, row_adj_2, all_squares)
-    capture_diags(all_squares, row_adj_1)
-    en_passant(all_squares, other_player, row_adj_1)
-    transform_pawn(final_row)
+    move_two(square_above, row_adj_two, all_squares) if @total_moves.zero?
+    capture_left_diag(row_adj, l_diag)
+    capture_right_diag(row_adj, r_diag)
+    en_passant(all_squares, other_player, l_diag, r_diag)
+    transform_pawn(final_row, all_squares) if @final_row.empty?
   end
 
-  def move_two(square_above, row_adj_2, all_squares)
-    return unless @total_moves.zero?
-
-    two_above = find("#{@square.column}#{@square.row + row_adj_2}", all_squares)
+  def move_two(square_above, row_adj_two, all_squares)
+    two_above = find("#{@square.column}#{@square.row + row_adj_two}", all_squares)
     @valid_moves << two_above if two_above.piece.nil? && square_above.piece.nil?
     @double_move = two_above
   end
 
-  def capture_diags(all_squares, row_adj_1)
-    if (C.index(@square.column) - 1) > -1 && (@square.row + row_adj_1).between?(1, 8)
-      l_diag = find("#{C[C.index(@square.column) - 1]}#{@square.row + row_adj_1}", all_squares)
+  def capture_left_diag(row_adj, l_diag)
+    if (C.index(@square.column) - 1) > -1 && (@square.row + row_adj).between?(1, 8)
       @valid_moves << l_diag unless l_diag.nil? || l_diag.piece.nil? || l_diag.piece.team == @team
     end
-    if (C.index(@square.column) + 1) < 8 && (@square.row + row_adj_1).between?(1, 8)
-      r_diag = find("#{C[C.index(@square.column) + 1]}#{@square.row + row_adj_1}", all_squares)
+  end
+
+  def capture_right_diag(row_adj, r_diag)
+    if (C.index(@square.column) + 1) < 8 && (@square.row + row_adj).between?(1, 8)
       @valid_moves << r_diag unless r_diag.nil? || r_diag.piece.nil? || r_diag.piece.team == @team
     end
   end
 
-  def en_passant(all_squares, other_player, row_adj_1)
+  def en_passant(all_squares, other_player, l_diag, r_diag)
+    # Special rules: If your opponent double moves for their pawn's first move,
+    # and that pawn ends adjacent to your pawn, you may capture it by moving to
+    # the space it moved through in its double move. This must happen the turn
+    # immediately after the double move.
     l = find("#{C[C.index(@square.column) - 1]}#{@square.row}", all_squares)
     r = find("#{C[C.index(@square.column) + 1]}#{@square.row}", all_squares)
-    l_diag = find("#{C[C.index(@square.column) - 1]}#{@square.row + row_adj_1}", all_squares)
-    r_diag = find("#{C[C.index(@square.column) + 1]}#{@square.row + row_adj_1}", all_squares)
     [l, r].each do |side|
       next if side.nil? || side.piece.nil? || side.piece.team == @team ||
               side.piece.type != 'pawn' || side.piece.double_moved == false ||
@@ -154,9 +161,9 @@ class Pawn < Piece
     end
   end
 
-  def transform_pawn(final_row)
-    @valid_moves.each do |square|
-      @final_row = square if square && square.row == final_row
+  def transform_pawn(final_row, all_squares)
+    all_squares.each do |square|
+      @final_row << square if square && square.row == final_row
     end
   end
 end
@@ -280,85 +287,77 @@ class King < Piece
 
   def update_valid_moves(all_squares, _other_player)
     @valid_moves = [] # Reset
-    transformations = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]
+    @left_castle = nil
+    @right_castle = nil
 
+    # Normal move 1 in any direction
+    transformations = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]
     transformations.each do |t|
       if (C.index(@square.column) + t[0]).between?(0, 7) && (@square.row + t[1]).between?(1, 8)
         @valid_moves << find("#{C[C.index(@square.column) + t[0]]}#{@square.row + t[1]}", all_squares)
       end
     end
-
     @valid_moves = clean_valid_moves(@valid_moves)
 
     # Castle special move
-    if @total_moves > 0
-      @left_castle = nil
-      @right_castle = nil
-      return
-    end
+    castle(all_squares) if @total_moves.zero?
+  end
 
-    enemy_moves = []
+  def get_pieces(all_squares)
     pieces = []
     all_squares.each do |sq|
       next if sq.piece.nil?
+
       pieces << sq.piece
     end
-    enemy_pieces = pieces.select { |p| p.team != @team }
+    pieces
+  end
+
+  def get_enemy_moves(all_squares)
+    enemy_moves = []
+    pieces = get_pieces(all_squares)
+
+    enemy_pieces = pieces.reject { |p| p.team == @team }
     enemy_pieces.each { |p| p.valid_moves.each { |move| enemy_moves << move } }
+  end
+
+  def castle(all_squares)
+    # Castling rules: the king hasn't moved, the rook hasn't moved, there are no
+    # pieces between the two, the king is not in check, and the king would not be
+    # in check in any of the spaces it has to move through to castle
+
+    enemy_moves = get_enemy_moves(all_squares)
+    return if enemy_moves.any?(@square)
+
+    # Get all squares in the same row as the king
+    l = [find("#{C[C.index(@square.column) - 1]}#{@square.row}", all_squares),
+         find("#{C[C.index(@square.column) - 2]}#{@square.row}", all_squares),
+         find("#{C[C.index(@square.column) - 3]}#{@square.row}", all_squares)]
+    r = [find("#{C[C.index(@square.column) + 1]}#{@square.row}", all_squares),
+         find("#{C[C.index(@square.column) + 2]}#{@square.row}", all_squares),
+         find("#{C[C.index(@square.column) + 3]}#{@square.row}", all_squares)]
     if @team == 'team_one'
-      l = [find("#{C[C.index(@square.column) - 1]}#{@square.row}", all_squares),
-           find("#{C[C.index(@square.column) - 2]}#{@square.row}", all_squares),
-           find("#{C[C.index(@square.column) - 3]}#{@square.row}", all_squares),
-           find("#{C[C.index(@square.column) - 4]}#{@square.row}", all_squares)]
-      l_rook = l[3].piece if l[3].piece
-      if l[0..2].all? { |sq| sq.piece.nil? } && l_rook && l_rook.total_moves.zero? &&
-         @total_moves.zero? && l[0..1].each { |sq| enemy_moves.none?(sq) } &&
-         enemy_moves.none?(@square)
-        @left_castle = l[1]
-        @valid_moves << l[1]
-        @left_rook_square = l_rook.square
-        @left_rook_destination = l[0]
-      end
-
-      r = [find("#{C[C.index(@square.column) + 1]}#{@square.row}", all_squares),
-           find("#{C[C.index(@square.column) + 2]}#{@square.row}", all_squares),
-           find("#{C[C.index(@square.column) + 3]}#{@square.row}", all_squares)]
-      r_rook = r[2].piece if l[2].piece
-      if r[0..1].all? { |sq| sq.piece.nil? } && r_rook && r_rook.total_moves.zero? &&
-         @total_moves.zero? && r[0..1].each { |sq| enemy_moves.none?(sq) } &&
-         enemy_moves.none?(@square)
-        @right_castle = r[1]
-        @valid_moves << r[1]
-        @right_rook_square = r_rook.square
-        @right_rook_destination = r[0]
-      end
+      l << find("#{C[C.index(@square.column) - 4]}#{@square.row}", all_squares)
     elsif @team == 'team_two'
-      l = [find("#{C[C.index(@square.column) - 1]}#{@square.row}", all_squares),
-           find("#{C[C.index(@square.column) - 2]}#{@square.row}", all_squares),
-           find("#{C[C.index(@square.column) - 3]}#{@square.row}", all_squares)]
-      l_rook = l[2].piece if l[2].piece
-      if l[0..1].all? { |sq| sq.piece.nil? } && l_rook && l_rook.total_moves.zero? &&
-         @total_moves.zero? && l[0..1] { |sq| enemy_moves.none?(sq) } &&
-         enemy_moves.none?(@square)
-        @left_castle = l[1]
-        @valid_moves << l[1]
-        @left_rook_square = l_rook.square
-        @left_rook_destination = l[0]
-      end
+      r << find("#{C[C.index(@square.column) + 4]}#{@square.row}", all_squares)
+    end
 
-      r = [find("#{C[C.index(@square.column) + 1]}#{@square.row}", all_squares),
-           find("#{C[C.index(@square.column) + 2]}#{@square.row}", all_squares),
-           find("#{C[C.index(@square.column) + 3]}#{@square.row}", all_squares),
-           find("#{C[C.index(@square.column) + 4]}#{@square.row}", all_squares)]
-      r_rook = r[3].piece if r[3].piece
-      if r[0..2].all? { |sq| sq.piece.nil? } && r_rook && r_rook.total_moves.zero? &&
-         @total_moves.zero? && r[0..1] { |sq| enemy_moves.none?(sq) } &&
-         enemy_moves.none?(@square)
-        @right_castle = r[1]
-        @valid_moves << r[1]
-        @right_rook_square = r_rook.square
-        @right_rook_destination = r[0]
-      end
+    # If the squares meet castling criteria, add to @valid_moves and update helper variables
+    l_rook = l.last.piece if l.last.piece
+    if l[0..-2].all? { |sq| sq.piece.nil? } && l_rook && l_rook.total_moves.zero? &&
+        @total_moves.zero? && l[0..1].each { |sq| enemy_moves.none?(sq) }
+      @left_castle = l[1]
+      @valid_moves << l[1]
+      @left_rook_square = l_rook.square
+      @left_rook_destination = l[0]
+    end
+    r_rook = r.last.piece if r.last.piece
+    if r[0..-2].all? { |sq| sq.piece.nil? } && r_rook && r_rook.total_moves.zero? &&
+        @total_moves.zero? && r[0..1].each { |sq| enemy_moves.none?(sq) }
+      @right_castle = r[1]
+      @valid_moves << r[1]
+      @right_rook_square = r_rook.square
+      @right_rook_destination = r[0]
     end
   end
 end
