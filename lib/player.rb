@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Player
   attr_reader :team, :player, :name
   attr_accessor :all_valid_moves, :total_moves

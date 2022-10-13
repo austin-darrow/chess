@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 class Piece
   attr_reader :type, :team, :board_piece
   attr_accessor :square, :total_moves, :valid_moves

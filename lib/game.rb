@@ -1,18 +1,47 @@
+# frozen_string_literal: true
+
 require_relative 'board'
 require_relative 'player'
 require_relative 'piece'
+require_relative 'save'
+require 'yaml'
 
 class Game
-  attr_accessor :board, :current_player, :other_player
+  attr_accessor :board, :current_player, :other_player, :last_move
   attr_reader :player1, :player2
+
+  include Saves
 
   def initialize
     @board = BoardCreator.new.game_board
     display_board
+    game_type
+  end
+
+  def new_game
     @player1 = Player.new('team_one', 'Player 1')
     @player2 = Player.new('team_two', 'Player 2')
     @current_player = @player1
     @other_player = @player2
+    play_game
+  end
+
+  def game_type
+    puts '===================================='
+    puts '=======   Welcome to chess   ======='
+    puts '=======   ----------------   ======='
+    puts '=======   [1] new game       ======='
+    puts '=======   [2] load game      ======='
+    puts '===================================='
+    input = gets.chomp
+    new_game if input == '1'
+    load_game if input == '2'
+  end
+
+  def load_game
+    find_saved_file
+    load_saved_file
+    play_game
   end
 
   def play_game
@@ -21,24 +50,26 @@ class Game
       update_moves_all_pieces
       if @current_player.all_valid_moves.empty?
         game_over = true
-        @current_player = @current_player == @player1 ? @player2 : @player1
-        @other_player = @other_player == @player1 ? @player2 : @player1
       else
         display_board
         make_move
         display_board
-        @current_player = @current_player == @player1 ? @player2 : @player1
-        @other_player = @other_player == @player1 ? @player2 : @player1
       end
+      @other_player = @current_player
+      @current_player = @current_player == @player1 ? @player2 : @player1
     end
-    puts 'GAME OVER'
+    puts "\n\nGAME OVER"
     puts "#{@current_player.name} wins!"
   end
 
   def make_move
-    print "#{@current_player.name}, enter coordinates of a piece to move: "
+    puts "#{@other_player.name} moved #{@last_move}" if @last_move
+    print "#{@current_player.name}, enter coordinates of a piece to move: (or 'save' to save the current game) "
     piece_coord = gets.chomp.upcase
+    save_game if piece_coord == 'SAVE'
+
     piece_coord = gets.chomp.upcase until validate_piece(piece_coord)
+
     piece = find_square_by_coordinates(piece_coord).piece
 
     print "#{piece_coord} #{piece.type} can make the following moves: "
@@ -47,6 +78,7 @@ class Game
     print "\n#{@current_player.name}, enter destination coordinates: "
     destination_coord = gets.chomp.upcase
     destination_coord = gets.chomp.upcase until validate_destination(destination_coord, piece)
+    update_last_move(piece, destination_coord)
 
     # Check for all special moves & update the board
     double_move(piece, destination_coord)
@@ -66,6 +98,10 @@ class Game
 
     piece.total_moves += 1
     @current_player.total_moves += 1
+  end
+
+  def update_last_move(piece, destination_coord)
+    @last_move = "#{piece.square.coord} #{piece.type} to #{destination_coord}"
   end
 
   def double_move(piece, destination_coord)
@@ -150,7 +186,7 @@ class Game
     if piece.valid_moves.include?(destination_square)
       true
     else
-      print "Invalid entry. Valid moves include: "
+      print 'Invalid entry. Valid moves include: '
       piece.valid_moves.each { |square| print "#{square.coord} " }
       print "\n#{@current_player.name}, enter a valid move for #{piece.square.coord} #{piece.type}: "
     end
@@ -228,7 +264,7 @@ class Game
     puts '   A  B  C  D  E  F  G  H '
     n = 8
     @board.each do |row|
-      display = ''
+      display = +''
       row.each do |square|
         if square.piece.nil?
           display << "#{square.styling}   \e[0m"
@@ -239,6 +275,6 @@ class Game
       puts "#{n} #{display}\e[0m #{n}"
       n -= 1
     end
-    puts "   A  B  C  D  E  F  G  H \n\n\n"
+    puts "   A  B  C  D  E  F  G  H \n\n"
   end
 end
