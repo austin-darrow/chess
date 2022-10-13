@@ -63,6 +63,11 @@ class Piece
     end
     [lu, ld, ru, rd]
   end
+
+  def clean_valid_moves(*unclean)
+    valid = [unclean].flatten.compact
+    valid.select! { |sq| sq.piece ? sq.piece.team != @team : sq }
+  end
 end
 
 # =========================================================================
@@ -100,15 +105,15 @@ class Pawn < Piece
 
       # Capture enemy pieces if in diagonals 1 away
       if (C.index(@square.column) - 1) > -1 && (@square.row + 1) < 9
-        left_up_diag = find("#{C[C.index(@square.column) - 1]}#{@square.row + 1}", all_squares)
-        unless left_up_diag.nil? || left_up_diag.piece.nil? || left_up_diag.piece.team == @team
-          @valid_moves << left_up_diag
+        l_diag = find("#{C[C.index(@square.column) - 1]}#{@square.row + 1}", all_squares)
+        unless l_diag.nil? || l_diag.piece.nil? || l_diag.piece.team == @team
+          @valid_moves << l_diag
         end
       end
       if (C.index(@square.column) + 1) < 8 && (@square.row + 1) < 9
-        right_up_diag = find("#{C[C.index(@square.column) + 1]}#{@square.row + 1}", all_squares)
-        unless right_up_diag.nil? || right_up_diag.piece.nil? || right_up_diag.piece.team == @team
-          @valid_moves << right_up_diag
+        r_diag = find("#{C[C.index(@square.column) + 1]}#{@square.row + 1}", all_squares)
+        unless r_diag.nil? || r_diag.piece.nil? || r_diag.piece.team == @team
+          @valid_moves << r_diag
         end
       end
 
@@ -119,13 +124,13 @@ class Pawn < Piece
         unless side.nil? || side.piece.nil? || side.piece.team == @team
           if side.piece.type == 'pawn' && side.piece.double_moved == true
             if side == r
-              @valid_moves << right_up_diag
+              @valid_moves << r_diag
               @en_passant_square = r
-              @en_passant_destination = right_up_diag
+              @en_passant_destination = r_diag
             elsif side == l
-              @valid_moves << left_up_diag
+              @valid_moves << l_diag
               @en_passant_square = l
-              @en_passant_destination = left_up_diag
+              @en_passant_destination = l_diag
             end
           end
         end
@@ -152,15 +157,15 @@ class Pawn < Piece
 
       # Capture enemy pieces if in diagonals 1 away
       if (C.index(@square.column) - 1) > -1 && (@square.row - 1) > 0
-        left_down_diag = find("#{C[C.index(@square.column) - 1]}#{@square.row - 1}" , all_squares)
-        unless left_down_diag.nil? || left_down_diag.piece.nil? || left_down_diag.piece.team == @team
-          @valid_moves << left_down_diag
+        l_diag = find("#{C[C.index(@square.column) - 1]}#{@square.row - 1}" , all_squares)
+        unless l_diag.nil? || l_diag.piece.nil? || l_diag.piece.team == @team
+          @valid_moves << l_diag
         end
       end
       if (C.index(@square.column) + 1) < 8 && (@square.row - 1) > 0
-        right_down_diag = find("#{C[C.index(@square.column) + 1]}#{@square.row - 1}" , all_squares)
-        unless right_down_diag.nil? || right_down_diag.piece.nil? || right_down_diag.piece.team == @team
-          @valid_moves << right_down_diag
+        r_diag = find("#{C[C.index(@square.column) + 1]}#{@square.row - 1}" , all_squares)
+        unless r_diag.nil? || r_diag.piece.nil? || r_diag.piece.team == @team
+          @valid_moves << r_diag
         end
       end
 
@@ -171,13 +176,13 @@ class Pawn < Piece
         unless side.nil? || side.piece.nil? || side.piece.team == @team
           if side.piece.type == 'pawn' && side.piece.double_moved == true
             if side == r
-              @valid_moves << right_down_diag
+              @valid_moves << r_diag
               @en_passant_square = r
-              @en_passant_destination = right_down_diag
+              @en_passant_destination = r_diag
             elsif side == l
-              @valid_moves << left_down_diag
+              @valid_moves << l_diag
               @en_passant_square = l
-              @en_passant_destination = left_down_diag
+              @en_passant_destination = l_diag
             end
           end
         end
@@ -211,10 +216,7 @@ class Rook < Piece
     [l, d].each { |arr| arr.replace(remove_jumps(arr, 'negative')) }
     [r, u].each { |arr| arr.replace(remove_jumps(arr, 'positive')) }
 
-    # Add all to @valid_moves and clean it up
-    valid = [l, d, r, u].flatten.compact
-    valid.select! { |sq| sq.piece ? sq.piece.team != @team : sq }
-    @valid_moves = valid
+    @valid_moves = clean_valid_moves(l, d, r, u)
   end
 end
 
@@ -246,10 +248,7 @@ class Knight < Piece
       end
     end
 
-    # Remove squares if they contain same team pieces
-    @valid_moves.select! do |sq|
-      sq.piece.nil? || sq.piece.team != @team
-    end
+    @valid_moves = clean_valid_moves(@valid_moves)
   end
 end
 
@@ -270,10 +269,7 @@ class Bishop < Piece
     # only knights can jump other pieces
     [lu, ld, ru, rd].each { |arr| arr.replace(remove_jumps(arr)) }
 
-    # Add all valid moves to array
-    valid = [lu, ld, ru, rd].flatten.compact
-    valid.select! { |sq| sq.piece ? sq.piece.team != @team : sq }
-    @valid_moves = valid
+    @valid_moves = clean_valid_moves(lu, ld, ru, rd)
   end
 end
 
@@ -297,10 +293,7 @@ class Queen < Piece
     [l, d].each { |arr| arr.replace(remove_jumps(arr, 'negative')) }
     [r, u].each { |arr| arr.replace(remove_jumps(arr, 'positive')) }
 
-    # Add all valid moves to array
-    valid = [lu, ld, ru, rd, l, d, r, u].flatten.compact
-    valid.select! { |sq| sq.piece ? sq.piece.team != @team : sq }
-    @valid_moves = valid
+    @valid_moves = clean_valid_moves(lu, ld, ru, rd, l, d, r, u)
   end
 end
 
@@ -332,8 +325,7 @@ class King < Piece
       end
     end
 
-    # Select only moves that don't include same team pieces
-    @valid_moves.select! { |sq| sq.piece ? sq.piece.team != @team : sq }
+    @valid_moves = clean_valid_moves(@valid_moves)
 
     # Castle special move
     if @total_moves > 0

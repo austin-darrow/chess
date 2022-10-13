@@ -24,7 +24,6 @@ class Game
       else
         display_board
         make_move
-        # Check & apply special conditions (pawn transform, en passant)
         display_board
         @current_player = @current_player == @player1 ? @player2 : @player1
       end
@@ -66,7 +65,7 @@ class Game
   def double_move(piece, destination_coord)
     if piece.type == 'pawn'
       piece.double_moved = false
-      if find_square_by_coordinates(destination_coord) == piece.double_move
+      if find_square_by_coordinates(destination_coord) == piece.double_move && piece.total_moves == 0
         piece.double_moved = true
       end
     end
