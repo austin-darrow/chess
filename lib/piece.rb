@@ -33,7 +33,7 @@ class Piece
     valid_arr << full_array.first
   end
 
-  def add_cardinal_squares(u, d, l, r, all_squares)
+  def add_cardinal_squares(all_squares)
     u, d, l, r = [], [], [], []
     all_squares.each do |other_square|
       if @square.row == other_square.row
@@ -54,7 +54,7 @@ class Piece
     [u, d, l, r]
   end
 
-  def add_diagonal_squares(lu, ld, ru, rd, all_squares)
+  def add_diagonal_squares(all_squares)
     lu, ld, ru, rd = [], [], [], []
     for i in 1..7 do
       x = C.index(@square.column)
@@ -128,15 +128,17 @@ class Pawn < Piece
   end
 
   def capture_left_diag(row_adj, l_diag)
-    if (C.index(@square.column) - 1) > -1 && (@square.row + row_adj).between?(1, 8)
-      @valid_moves << l_diag unless l_diag.nil? || l_diag.piece.nil? || l_diag.piece.team == @team
-    end
+    return unless l_diag && l_diag.piece && (C.index(@square.column) - 1) > -1 &&
+                  (@square.row + row_adj).between?(1, 8) && l_diag.piece.team != @team
+
+    @valid_moves << l_diag
   end
 
   def capture_right_diag(row_adj, r_diag)
-    if (C.index(@square.column) + 1) < 8 && (@square.row + row_adj).between?(1, 8)
-      @valid_moves << r_diag unless r_diag.nil? || r_diag.piece.nil? || r_diag.piece.team == @team
-    end
+    return unless r_diag && r_diag.piece && (C.index(@square.column) + 1) < 8 &&
+                  (@square.row + row_adj).between?(1, 8) && r_diag.piece.team != @team
+
+    @valid_moves << r_diag
   end
 
   def en_passant(all_squares, other_player, l_diag, r_diag)
@@ -181,7 +183,7 @@ class Rook < Piece
 
   def update_valid_moves(all_squares, _other_player)
     @valid_moves = [] # Reset
-    u, d, l, r = add_cardinal_squares(u, d, l, r, all_squares)
+    u, d, l, r = add_cardinal_squares(all_squares)
 
     # Extract from each array only empty squares + first square with an enemy piece;
     # only knights can jump other pieces
@@ -208,16 +210,16 @@ class Knight < Piece
     transformations = [[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]]
     valid_coords = []
     transformations.each do |t|
-      if (C.index(@square.column) + t[0]).between?(0, 7) && (@square.row + t[1]).between?(1, 8)
-        valid_coords << [C[C.index(@square.column) + t[0]], (@square.row + t[1])].join
-      end
+      next unless (C.index(@square.column) + t[0]).between?(0, 7) && (@square.row + t[1]).between?(1, 8)
+
+      valid_coords << [C[C.index(@square.column) + t[0]], (@square.row + t[1])].join
     end
 
     # Convert array of valid coordinates into Square objects; add each to @valid_moves
     all_squares.each do |other_square|
-      if valid_coords.any? { |c| c == other_square.coord }
-        @valid_moves << other_square
-      end
+      next unless valid_coords.any? { |c| c == other_square.coord }
+
+      @valid_moves << other_square
     end
 
     @valid_moves = clean_valid_moves(@valid_moves)
@@ -235,7 +237,7 @@ class Bishop < Piece
 
   def update_valid_moves(all_squares, _other_player)
     @valid_moves = [] # Reset
-    lu, ld, ru, rd = add_diagonal_squares(lu, ld, ru, rd, all_squares)
+    lu, ld, ru, rd = add_diagonal_squares(all_squares)
 
     # Extract from each array only empty squares + first square with an enemy piece;
     # only knights can jump other pieces
@@ -256,8 +258,8 @@ class Queen < Piece
 
   def update_valid_moves(all_squares, _other_player)
     @valid_moves = [] # Reset
-    lu, ld, ru, rd = add_diagonal_squares(lu, ld, ru, rd, all_squares)
-    u, d, l, r = add_cardinal_squares(u, d, l, r, all_squares)
+    lu, ld, ru, rd = add_diagonal_squares(all_squares)
+    u, d, l, r = add_cardinal_squares(all_squares)
 
     # Extract from each array only empty squares + first square with an enemy piece;
     # only knights can jump other pieces
@@ -295,9 +297,9 @@ class King < Piece
     # Normal move 1 in any direction
     transformations = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]
     transformations.each do |t|
-      if (C.index(@square.column) + t[0]).between?(0, 7) && (@square.row + t[1]).between?(1, 8)
-        @valid_moves << find("#{C[C.index(@square.column) + t[0]]}#{@square.row + t[1]}", all_squares)
-      end
+      next unless (C.index(@square.column) + t[0]).between?(0, 7) && (@square.row + t[1]).between?(1, 8)
+
+      @valid_moves << find("#{C[C.index(@square.column) + t[0]]}#{@square.row + t[1]}", all_squares)
     end
     @valid_moves = clean_valid_moves(@valid_moves)
 

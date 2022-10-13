@@ -18,14 +18,6 @@ class Game
     game_type
   end
 
-  def new_game
-    @player1 = Player.new('team_one', 'Player 1')
-    @player2 = Player.new('team_two', 'Player 2')
-    @current_player = @player1
-    @other_player = @player2
-    play_game
-  end
-
   def game_type
     puts '===================================='
     puts '=======   Welcome to chess   ======='
@@ -36,6 +28,14 @@ class Game
     input = gets.chomp
     new_game if input == '1'
     load_game if input == '2'
+  end
+
+  def new_game
+    @player1 = Player.new('team_one', 'Player 1')
+    @player2 = Player.new('team_two', 'Player 2')
+    @current_player = @player1
+    @other_player = @player2
+    play_game
   end
 
   def load_game
@@ -62,11 +62,20 @@ class Game
     puts "#{@current_player.name} wins!"
   end
 
+  def update_moves_all_pieces
+    pieces = get_pieces
+    pieces.each { |piece| piece.update_valid_moves(@board.flatten, @other_player) }
+    check_checkmate
+  end
+
   def make_move
     puts "#{@other_player.name} moved #{@last_move}" if @last_move
     print "#{@current_player.name}, enter coordinates of a piece to move: (or 'save' to save the current game) "
     piece_coord = gets.chomp.upcase
-    save_game if piece_coord == 'SAVE'
+    if piece_coord == 'SAVE'
+      save_game
+      Game.new
+    end
 
     piece_coord = gets.chomp.upcase until validate_piece(piece_coord)
 
@@ -86,81 +95,6 @@ class Game
     castle(piece, destination_coord)
     update_board(piece, destination_coord)
     transform_pawn(piece, destination_coord)
-  end
-
-  def update_board(piece, destination_coord)
-    destination_square = find_square_by_coordinates(destination_coord)
-
-    # Moves the selected piece to the chosen destination. Updates old and new Squares
-    destination_square.piece = piece
-    piece.square.piece = nil
-    piece.square = destination_square
-
-    piece.total_moves += 1
-    @current_player.total_moves += 1
-  end
-
-  def update_last_move(piece, destination_coord)
-    @last_move = "#{piece.square.coord} #{piece.type} to #{destination_coord}"
-  end
-
-  def double_move(piece, destination_coord)
-    # Updates #double_moved, making this piece a target for en passant
-    if piece.type == 'pawn'
-      piece.double_moved = false
-      if find_square_by_coordinates(destination_coord) == piece.double_move
-        piece.double_moved = true
-        piece.total_moves_when_double_moved = @current_player.total_moves + 1
-      end
-    end
-  end
-
-  def en_passant(piece, destination_coord)
-    # Removes the captured enemy pawn
-    if piece.type == 'pawn' && piece.en_passant_square
-      if find_square_by_coordinates(destination_coord) == piece.en_passant_destination
-        piece.en_passant_square.piece = nil
-        piece.en_passant_square = nil
-      end
-    end
-  end
-
-  def transform_pawn(piece, destination_coord)
-    if piece.type == 'pawn' && piece.final_row.any?(find_square_by_coordinates(destination_coord))
-      puts "What do you want to transform your pawn into?"
-      puts "Queen = 'q' | Bishop = 'b' | Knight = 'k' | Rook = 'r'"
-      valid_responses = %w[q b k r]
-      response = gets.chomp.downcase
-      until valid_responses.include?(response)
-        puts "Invalid entry"
-        response = gets.chomp.downcase
-      end
-
-      case response
-      when 'q'
-        piece.square.piece = Queen.new('queen', @current_player.team, piece.square)
-      when 'b'
-        piece.square.piece = Bishop.new('bishop', @current_player.team, piece.square)
-      when 'k'
-        piece.square.piece = Knight.new('knight', @current_player.team, piece.square)
-      when 'r'
-        piece.square.piece = Rook.new('rook', @current_player.team, piece.square)
-      end
-    end
-  end
-
-  def castle(piece, destination_coord)
-    # Moves the rook that the king is castling in
-    dest_sq = find_square_by_coordinates(destination_coord)
-    if piece.type == 'king' && dest_sq == piece.left_castle
-      piece.left_rook_destination.piece = piece.left_rook_square.piece
-      piece.left_rook_square.piece = nil
-      piece.left_rook_destination.piece.square = piece.left_rook_destination
-    elsif piece.type == 'king' && dest_sq == piece.right_castle
-      piece.right_rook_destination.piece = piece.right_rook_square.piece
-      piece.right_rook_square.piece = nil
-      piece.right_rook_destination.piece.square = piece.right_rook_destination
-    end
   end
 
   def validate_piece(coord)
@@ -192,6 +126,80 @@ class Game
     end
   end
 
+  def update_last_move(piece, destination_coord)
+    @last_move = "#{piece.square.coord} #{piece.type} to #{destination_coord}"
+  end
+
+  def update_board(piece, destination_coord)
+    destination_square = find_square_by_coordinates(destination_coord)
+
+    # Moves the selected piece to the chosen destination. Updates old and new Squares
+    destination_square.piece = piece
+    piece.square.piece = nil
+    piece.square = destination_square
+
+    piece.total_moves += 1
+    @current_player.total_moves += 1
+  end
+
+  def double_move(piece, destination_coord)
+    # Updates #double_moved, making this piece a target for en passant
+    return unless piece.type == 'pawn'
+
+    piece.double_moved = false
+    return unless find_square_by_coordinates(destination_coord) == piece.double_move
+
+    piece.double_moved = true
+    piece.total_moves_when_double_moved = @current_player.total_moves + 1
+  end
+
+  def en_passant(piece, destination_coord)
+    # Removes the captured enemy pawn
+    return unless piece.type == 'pawn' && piece.en_passant_square &&
+                  find_square_by_coordinates(destination_coord) == piece.en_passant_destination
+
+    piece.en_passant_square.piece = nil
+    piece.en_passant_square = nil
+  end
+
+  def transform_pawn(piece, destination_coord)
+    return unless piece.type == 'pawn' && piece.final_row.any?(find_square_by_coordinates(destination_coord))
+
+    puts 'What do you want to transform your pawn into?'
+    puts "Queen = 'q' | Bishop = 'b' | Knight = 'k' | Rook = 'r'"
+    valid_responses = %w[q b k r]
+    response = gets.chomp.downcase
+    until valid_responses.include?(response)
+      puts 'Invalid entry'
+      response = gets.chomp.downcase
+    end
+
+    case response
+    when 'q'
+      piece.square.piece = Queen.new('queen', @current_player.team, piece.square)
+    when 'b'
+      piece.square.piece = Bishop.new('bishop', @current_player.team, piece.square)
+    when 'k'
+      piece.square.piece = Knight.new('knight', @current_player.team, piece.square)
+    when 'r'
+      piece.square.piece = Rook.new('rook', @current_player.team, piece.square)
+    end
+  end
+
+  def castle(piece, destination_coord)
+    # Moves the rook that the king is castling in
+    dest_sq = find_square_by_coordinates(destination_coord)
+    if piece.type == 'king' && dest_sq == piece.left_castle
+      piece.left_rook_destination.piece = piece.left_rook_square.piece
+      piece.left_rook_square.piece = nil
+      piece.left_rook_destination.piece.square = piece.left_rook_destination
+    elsif piece.type == 'king' && dest_sq == piece.right_castle
+      piece.right_rook_destination.piece = piece.right_rook_square.piece
+      piece.right_rook_square.piece = nil
+      piece.right_rook_destination.piece.square = piece.right_rook_destination
+    end
+  end
+
   def check_checkmate
     @current_player.all_valid_moves = []
     team_pieces = get_pieces.select { |piece| piece.team == @current_player.team }
@@ -202,12 +210,12 @@ class Game
         # Implement the move just to test it out
         piece.square.piece = nil
         saved_square = piece.square
-        saved_piece = move.piece unless move.piece.nil?
+        saved_piece = move.piece || nil
         move.piece = piece
         piece.square = move
 
         # Update opposing team moves
-        opposing_team_pieces = get_pieces.select { |p| p.team != @current_player.team }
+        opposing_team_pieces = get_pieces.reject { |p| p.team == @current_player.team }
         opposing_team_pieces.each { |p| p.update_valid_moves(@board.flatten, @other_player) }
 
         # Determine if the king is now in check
@@ -215,6 +223,7 @@ class Game
         opposing_team_moves = []
         get_pieces.each do |p|
           next if p.team == @current_player.team
+
           p.valid_moves.each { |m| opposing_team_moves << m }
         end
 
@@ -225,11 +234,7 @@ class Game
         end
 
         # Undo the move now that testing is finished
-        if saved_piece
-          move.piece = saved_piece
-        else
-          move.piece = nil
-        end
+        move.piece = saved_piece
         saved_square.piece = piece
         piece.square = saved_square
       end
@@ -251,12 +256,6 @@ class Game
 
   def find_square_by_coordinates(coord)
     @board.flatten.select { |sq| sq.coord == coord }.first
-  end
-
-  def update_moves_all_pieces
-    pieces = get_pieces
-    pieces.each { |piece| piece.update_valid_moves(@board.flatten, @other_player) }
-    check_checkmate
   end
 
   def display_board
