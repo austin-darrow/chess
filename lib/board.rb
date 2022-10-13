@@ -1,19 +1,13 @@
 # frozen_string_literal: true
 
-require_relative 'piece'
-
-class Square
-  attr_reader :coord, :styling, :row, :column
-  attr_accessor :piece
-
-  def initialize(styling, coord)
-    @coord = coord
-    @column = coord.split('').first
-    @row = coord.split('').last.to_i
-    @styling = styling
-    @piece = nil
-  end
-end
+require_relative 'pieces/piece'
+require_relative 'pieces/king'
+require_relative 'pieces/queen'
+require_relative 'pieces/bishop'
+require_relative 'pieces/knight'
+require_relative 'pieces/rook'
+require_relative 'pieces/pawn'
+require_relative 'square'
 
 class BoardCreator
   attr_accessor :game_board
